@@ -7,104 +7,74 @@
 #include <stdio.h>
 
 #include "bitfile.h"
-
-/*
-struct bitfile {
-  FILE * file;
-  unsigned char buffer;
-  int index;
-  int is_read_mode;
-  int is_EOF;
-};
-*/
-
-/*
-file = fopen(argv[1], "r");
-assert( file != NULL );
-c = fgetc(file);	// attempt to read a byte
-while( !feof(file) ) {
-printf("%c", c);
-c = fgetc(file);
-}
-fclose(file);
-*/
-
-	//    int fputc(int c, FILE * file); // writes a single byte to file
-	//    int fgetc (FILE * file);       // reads a single byte from a file
+#define BIT_MAX 7
+#define BIT_MIN 0
 
 // open a bit file in "r" (read) mode or "w" (write) mode
-struct bitfile * bitfile_open(char * filename, char * mode)
-{ 
-	struct bitfile * result;
-	result = calloc(1, sizeof(struct bitfile)); 
-	result->file = fopen(filename, mode);
-	result->buffer = 0;
-	result->index = 0;
-	if(atoi(mode) == (int) 'r')
-		result->is_read_mode = 1;
-	else
-		result->is_read_mode = 0;
-	result->is_EOF = 0;
-	return result;
+//readmode 1=read, 0=write
+struct bitfile *bitfile_open(char *filename, char *mode)
+{
+    struct bitfile *theFile = malloc(sizeof(struct bitfile)); //make some space
+    theFile->file = fopen(filename, mode);                    //open the file
+    if (!strcmp("r", mode))                                   //make sure the read type is valid
+    {
+        theFile->buffer = fgetc(theFile->file); //get the first character
+        theFile->index = BIT_MIN;               //set index
+    }
+    else if (!strcmp("w", mode)) //make sure write type is valid
+    {
+        theFile->index = BIT_MAX; //set index
+        theFile->buffer = 0;      //clear buffer
+    }
+    else
+    {
+        fprintf(stderr, "ERROR! Mode must be 'r' or 'w'"); //tell the user they messed up
+        assert(1 == 0);                                    //Crash
+    }
+    theFile->is_read_mode = (!(*mode & 1)); //set boolean (r and w end with different bits)
+
+    return theFile;
 }
 
 // write a bit to a file; the file must have been opened in write mode
-void bitfile_write_bit(struct bitfile * this, int bit)
+void bitfile_write_bit(struct bitfile *this, int bit)
 {
-	if(this->is_EOF == 0)
-	{
-		if(this->is_read_mode == 0)
-		{
-			if(this->index < 8)
-			{
-				this->buffer = this->buffer + bit;
-				this->buffer = this->buffer << 1;
-				this->index++;
-			}
-			else
-			{
-				this->index = 0;
-				fputc(this->buffer, this->file);
-				this->buffer = 0;	
-			}
-		}
-		else
-		{
-			printf("You got an error boi, write_bit");
-		}
-	}
+    assert(!this->is_read_mode);                        //check to make sure this is safe
+    this->buffer |= (bit << (BIT_MAX - this->index--)); //add the bit to the buffer
+    if (this->index < BIT_MIN)                          //if at the end of the buffer, write buffer to file and reset
+    {
+        this->index = BIT_MAX;
+        fputc(this->buffer, this->file);
+        this->buffer = 0;
+    }
 }
 
 // read a bit from a file; the file must have been opened in read mode
-int bitfile_read_bit(struct bitfile * this)
+int bitfile_read_bit(struct bitfile *this)
 {
-	if(this->is_read_mode == 1)
-	{
-
-	}
-	else
-	{
-		printf("You got an error boi; read_bit");
-	}
-	return 0;
+    assert(this->is_read_mode); //check this is a valid operation
+    if (this->index > BIT_MAX)  //if at the end of the buffer, reset and get next char
+    {
+        this->buffer = 0;
+        this->buffer = fgetc(this->file);
+        this->index = BIT_MIN;
+    }
+    return ((this->buffer & (1 << this->index)) >> (this->index)++); //return the bit
 }
 
-// close a bitfile; flush any partially-filled buffer if file is open
-// in write mode
-void bitfile_close(struct bitfile * this) 
+// close a bitfile; flush any partially-filled buffer if file is open in write mode
+void bitfile_close(struct bitfile *this)
 {
-	//flush remaining bits
-	fputc(this->buffer, this->file);
-	fclose(this->file);
+    if (!this->is_read_mode && this->index != BIT_MAX)
+        fputc(this->buffer, this->file);
+    fclose(this->file);
+    free(this);
 }
 
-// check for end of file
-int bitfile_end_of_file(struct bitfile * this)
+// check for end of file, didn't actually use this
+int bitfile_end_of_file(struct bitfile *this)
 {
-	if(feof(this->file))
-	{
-		this->is_EOF = 1;
-		return 1;
-	}
-	else return 0;
+    if (this->is_read_mode && (int)this->buffer == EOF)
+        return 1;
+    return 0;
 }

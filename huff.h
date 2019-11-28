@@ -28,6 +28,7 @@ struct huffcoder {
   struct huffchar * tree;
 };
 
+
 // create a new huffcoder structure
 struct huffcoder *  huffcoder_new();
 
@@ -53,6 +54,10 @@ void huffcoder_print_codes(struct huffcoder * this);
 // encode the input file and write the encoding to the output file
 void huffcoder_encode(struct huffcoder * this, char * input_filename,
 		      char * output_filename);
+
+struct huffchar * find_node(struct huffchar * this, int bit);
+
+
 
 // decode the input file and write the decoding to the output file
 void huffcoder_decode(struct huffcoder * this, char * input_filename,

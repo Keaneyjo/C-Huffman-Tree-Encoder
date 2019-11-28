@@ -142,6 +142,14 @@ void huffcoder_print_codes(struct huffcoder * this)
   }
 }
 
+
+
+
+
+
+///////////////////////////////////////////////////////
+//void writeEOT(struct huffcoder * this, struct bitfile * bitF);
+
 // using the character frequencies build the tree of compound
 // and simple characters that are used to compute the Huffman codes
 void huffcoder_build_tree(struct huffcoder * this)
@@ -157,7 +165,7 @@ void huffcoder_build_tree(struct huffcoder * this)
 		buffer[i]->freq = this->freqs[i];
 		buffer[i]->is_compound = 0;
 		buffer[i]->seqno = i;
-		buffer[i]->u.c = (char) i;
+		buffer[i]->u.c = i;
 	}
 	int seqCount = NUM_CHARS;
 
@@ -167,8 +175,8 @@ void huffcoder_build_tree(struct huffcoder * this)
 		int placeTwo = 0;
 		struct huffchar * lowestOne = malloc(sizeof(struct huffchar));
 		struct huffchar * lowestTwo = malloc(sizeof(struct huffchar));
-		lowestOne->freq = TMP_MAX;
-		lowestTwo->freq = TMP_MAX;
+		lowestOne->freq = INT_MAX;
+		lowestTwo->freq = INT_MAX;
 
 		for(int i = 0; i < NUM_CHARS; i++)
 		{
@@ -264,31 +272,72 @@ void huffcoder_build_tree(struct huffcoder * this)
 
 }
 
-// encode the input file and write the encoding to the output file
-void huffcoder_encode(struct huffcoder * this, char * input_filename, char * output_filename)
+void huffcoder_decode(struct huffcoder *this, char *input_filename,
+                      char *output_filename)
 {
-	FILE * file =  fopen(input_filename, "r");
-	assert(file != NULL);
-	struct bitfile * output = bitfile_open(output_filename, "w");
-	
-	int c;
-	int mask = 1;
-	unsigned long long chuck;
-	while(!feof(file))
+	int EOTloc = 4;
+	struct bitfile *rFile = bitfile_open(input_filename, "r");
+	FILE *outFile = fopen(output_filename, "w");
+	int finished = 0;
+	struct huffchar * currentHuff = malloc(sizeof(struct huffchar));
+	currentHuff = this->tree;
+	while (finished == 0)//while EOT not reached
 	{
-		c = fgetc(file);
-		chuck =this->codes[c];
-		for(int i = 0; i < this->code_lengths[c]; i++)
+		int theBit = bitfile_read_bit(rFile);
+		currentHuff = find_node(currentHuff, theBit);
+		if (currentHuff->u.c == EOTloc)
 		{
-			bitfile_write_bit(output, mask & chuck);
-			chuck >>=1;
+			finished = 1;
 		}
+		if (currentHuff->is_compound == 0)
+		{
+			if (currentHuff->u.c != EOTloc){fputc(currentHuff->u.c, outFile);}
+			else {finished = 1;}
+			currentHuff = this->tree;
+		}
+	}
+	bitfile_close(rFile);
+
+}
+
+//Write the end of transmission to a file.
+void writeEOT(struct huffcoder *this, struct bitfile *bitF)
+{
+	int EOTloc = 4;
+	int EOTlength = this->code_lengths[EOTloc];
+	int EOTcode = this->codes[EOTloc];
+	for (int i = 0; i < EOTlength; i++)
+	{
+		bitfile_write_bit(bitF, (EOTcode >> i) & 1);
 	}
 }
 
-// decode the input file and write the decoding to the output file
-void huffcoder_decode(struct huffcoder * this, char * input_filename, char * output_filename)
+// encode the input file and write the encoding to the output file
+void huffcoder_encode(struct huffcoder *this, char *input_filename,
+                      char *output_filename)
 {
+	struct bitfile *outFile = bitfile_open(output_filename, "w");
+	FILE *readFile = fopen(input_filename, "r");
+	unsigned char currentChar = fgetc(readFile);
+	//While there are characters left
+	while (!feof(readFile))
+	{
+		int numToWrite = this->codes[currentChar];
+		int max = this->code_lengths[currentChar];
+		for (int i = 0; i < max; i++)//for every bit in a code, write the bit
+			bitfile_write_bit(outFile, (numToWrite >> i) & 1);
+		currentChar = fgetc(readFile);//get the next one
+	}
+	writeEOT(this, outFile);//Done, time to tidy up
+	bitfile_close(outFile);
+}
+
+struct huffchar * find_node(struct huffchar * this, int bit)
+{
+	if(bit == 0) return this->u.compound.left;
+	else return this->u.compound.right;
+}
+/*
 	FILE * file =  fopen(input_filename, "w");
 	assert(file != NULL);
 	struct bitfile * input = bitfile_open(output_filename, "r");
@@ -312,9 +361,7 @@ void huffcoder_decode(struct huffcoder * this, char * input_filename, char * out
 			theNode = this->tree;
 		}
 	}
-}
-
-
+*/
 
 
 /*
@@ -329,5 +376,28 @@ void huffcoder_decode(struct huffcoder * this, char * input_filename, char * out
 		fputc(int c, FILE * out_file);
 	}
 	fclose(in_file);
+*/
+
+/*
+void huffcoder_encode(struct huffcoder * this, char * input_filename, char * output_filename)
+{
+	FILE * file =  fopen(input_filename, "r");
+	assert(file != NULL);
+	struct bitfile * output = bitfile_open(output_filename, "w");
+	
+	int c;
+	int mask = 1;
+	unsigned long long chuck;
+	while(!feof(file))
+	{
+		c = fgetc(file);
+		chuck =this->codes[c];
+		for(int i = 0; i < this->code_lengths[c]; i++)
+		{
+			bitfile_write_bit(output, mask & chuck);
+			chuck = chuck >> 1;
+		}
+	}
+}
 */
 

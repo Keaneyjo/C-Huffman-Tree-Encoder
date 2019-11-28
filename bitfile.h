@@ -31,4 +31,5 @@ void bitfile_close(struct bitfile * this);
 int bitfile_end_of_file(struct bitfile * this);
 
 
+
 #endif // BITFILE_H
