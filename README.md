@@ -3,4 +3,4 @@ A C program which creates a huffman binary tree from a sample .txt file. Then en
 
 The program can then decode the file using that same huffman tree. 
 
-Sample files provided by Dr. David Gregg of Trinity College Dublin. 
+Function headers and main.c provided by Dr. David Gregg of Trinity College Dublin. 
